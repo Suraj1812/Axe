@@ -1,36 +1,64 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Axe
+
+Axe is a minimal production-ready 3D WebGL website builder built with Next.js, Three.js, React Three Fiber, Zustand, GSAP, Framer Motion, Express, MongoDB-compatible persistence, and JWT auth.
 
 ## Getting Started
 
-First, run the development server:
+Install dependencies, copy the local environment template, and run the web app plus API:
+
+```bash
+npm install
+cp .env.example .env.local
+npm run dev:full
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+The API runs on [http://localhost:4200](http://localhost:4200) by default.
+
+## Environment
+
+MongoDB is optional for local development. Without it, the Express API stores projects and users in `.axe-data/db.json`.
+
+```bash
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+NEXT_PUBLIC_API_URL=http://localhost:4200
+MONGODB_URI=mongodb://localhost:27017/axe
+MONGODB_DB=axe
+JWT_SECRET=replace-with-a-long-secret
+API_PORT=4200
+WEB_ORIGIN=http://localhost:3000
+```
+
+## Core Commands
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run api
+npm run dev:full
+npm run local
+npm run lint
+npm run build
+npm run check
+npm run start:full
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+For a production-style local run, build first, then start both the Express API and the Next.js app:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run build
+npm run start:full
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## API
 
-## Learn More
+- `POST /auth/register`
+- `POST /auth/login`
+- `POST /project`
+- `GET /project/:id`
 
-To learn more about Next.js, take a look at the following resources:
+Project routes accept a bearer token when available and also support guest saves for local-first editing.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Local Persistence
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+When `MONGODB_URI` is omitted, the API uses `.axe-data/db.json`. That folder is ignored by git, so local test users and projects stay on your machine.

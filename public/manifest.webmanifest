@@ -1,0 +1,17 @@
+{
+  "name": "Axe 3D Website Builder",
+  "short_name": "Axe",
+  "description": "A no-code 3D WebGL website builder for interactive Three.js websites.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#08090b",
+  "theme_color": "#08090b",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
