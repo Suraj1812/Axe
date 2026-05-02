@@ -204,6 +204,7 @@ export function EditorCanvas() {
     () => animatedObjects.filter((object) => object.visible),
     [animatedObjects],
   );
+  const canRenderScene = webglSupported === true;
 
   useEffect(() => {
     const canvas = document.createElement("canvas");
@@ -245,7 +246,7 @@ export function EditorCanvas() {
     >
       {webglSupported === null ? (
         <div className="flex h-full w-full items-center justify-center bg-[#090a0d] text-sm text-zinc-400">
-          Checking WebGL
+          <div className="h-8 w-8 animate-spin rounded-full border border-zinc-800 border-t-emerald-300" />
         </div>
       ) : webglSupported === false ? (
         <div className="flex h-full w-full items-center justify-center bg-[#090a0d] px-8 text-center">
@@ -263,6 +264,8 @@ export function EditorCanvas() {
         <CanvasErrorBoundary>
           <Canvas
             shadows
+            className="h-full w-full"
+            style={{ width: "100%", height: "100%" }}
             dpr={[1, 1.5]}
             camera={{ position: [4, 3, 5], fov: 46, near: 0.1, far: 200 }}
             gl={{ antialias: true, preserveDrawingBuffer: true }}
@@ -311,8 +314,8 @@ export function EditorCanvas() {
           </Canvas>
         </CanvasErrorBoundary>
       )}
-      <ScreenUiBlocks />
-      <CanvasHud />
+      {canRenderScene ? <ScreenUiBlocks /> : null}
+      {canRenderScene ? <CanvasHud /> : null}
     </div>
   );
 }

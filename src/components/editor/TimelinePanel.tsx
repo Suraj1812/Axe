@@ -42,9 +42,10 @@ export function TimelinePanel() {
   }, [isPlaying]);
 
   const playheadPercent = `${(currentTime / duration) * 100}%`;
+  const visibleTrackCount = Math.max(objects.length, 1);
 
   return (
-    <footer className="grid min-h-0 grid-cols-[286px_1fr_360px] bg-[#0b0c10]">
+    <footer className="grid min-h-0 grid-cols-[272px_minmax(440px,1fr)_328px] bg-[#0b0c10]">
       <div className="border-r border-zinc-800/90 p-4">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
@@ -105,14 +106,14 @@ export function TimelinePanel() {
             max={30}
             step={1}
             onChange={(event) => setDuration(Number(event.target.value))}
-            className="h-8 rounded-lg border border-zinc-800 bg-[#11141a] px-2 font-mono text-xs text-zinc-200 outline-none focus:border-emerald-300/70"
+            className="axe-control h-8 rounded-lg px-2 font-mono text-xs text-zinc-200 outline-none"
             aria-label="Duration"
           />
         </div>
       </div>
 
-      <div className="relative min-w-0 overflow-x-auto border-r border-zinc-800/90 p-4">
-        <div className="relative h-full min-w-[680px] rounded-lg border border-zinc-800 bg-[#0f1117]">
+      <div className="axe-scrollbar-thin relative min-w-0 overflow-auto border-r border-zinc-800/90 p-4">
+        <div className="relative h-full min-h-[132px] min-w-[680px] rounded-lg border border-zinc-800 bg-[#0f1117] shadow-inner shadow-black/20">
           <div
             className="absolute bottom-0 top-0 z-20 w-px bg-emerald-300"
             style={{ left: playheadPercent }}
@@ -121,8 +122,21 @@ export function TimelinePanel() {
             className="absolute top-0 z-20 h-3 w-3 -translate-x-1/2 rounded-full bg-emerald-300"
             style={{ left: playheadPercent }}
           />
-          <div className="grid h-full grid-rows-4">
-            {objects.slice(0, 4).map((object) => (
+          <div className="pointer-events-none absolute inset-x-0 top-0 grid grid-cols-5 border-b border-zinc-800/70">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <span
+                key={index}
+                className="h-6 border-l border-zinc-800/50 pl-2 pt-1 font-mono text-[10px] text-zinc-600 first:border-l-0"
+              >
+                {((duration / 4) * index).toFixed(0)}s
+              </span>
+            ))}
+          </div>
+          <div
+            className="grid h-full pt-6"
+            style={{ gridTemplateRows: `repeat(${visibleTrackCount}, minmax(30px, 1fr))` }}
+          >
+            {objects.map((object) => (
               <div
                 key={object.id}
                 className="relative border-b border-zinc-800/70 last:border-b-0"
@@ -144,6 +158,11 @@ export function TimelinePanel() {
                   ))}
               </div>
             ))}
+            {objects.length === 0 ? (
+              <div className="flex items-center px-3 text-xs text-zinc-600">
+                No timeline tracks
+              </div>
+            ) : null}
           </div>
           <div className="pointer-events-none absolute inset-x-0 bottom-0 top-0 grid grid-cols-8">
             {Array.from({ length: 8 }).map((_, index) => (
@@ -153,9 +172,9 @@ export function TimelinePanel() {
         </div>
       </div>
 
-      <div className="min-h-0 overflow-y-auto p-4">
+      <div className="axe-scrollbar-thin min-h-0 overflow-y-auto p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-xs font-semibold uppercase text-zinc-500">
+          <h2 className="axe-muted-label text-xs font-semibold uppercase">
             Keyframes
           </h2>
           <span className="font-mono text-[11px] text-zinc-600">
@@ -169,7 +188,7 @@ export function TimelinePanel() {
             return (
               <div
                 key={frame.id}
-                className="grid grid-cols-[1fr_68px_28px] items-center gap-2 rounded-lg border border-zinc-800 bg-[#11141a] p-2"
+                className="grid grid-cols-[1fr_68px_28px] items-center gap-2 rounded-lg border border-zinc-800 bg-[#11141a] p-2 shadow-sm shadow-black/10"
               >
                 <div className="min-w-0">
                   <div className="truncate text-xs text-zinc-300">
@@ -190,7 +209,7 @@ export function TimelinePanel() {
                       time: Number(event.target.value),
                     })
                   }
-                  className="h-8 rounded-lg border border-zinc-800 bg-[#0d0f13] px-2 font-mono text-xs text-zinc-200 outline-none focus:border-emerald-300/70"
+                  className="axe-control h-8 rounded-lg px-2 font-mono text-xs text-zinc-200 outline-none"
                   aria-label="Keyframe time"
                 />
                 <button
@@ -204,6 +223,11 @@ export function TimelinePanel() {
               </div>
             );
           })}
+          {keyframes.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-zinc-800 px-3 py-4 text-center text-sm text-zinc-500">
+              No keyframes
+            </div>
+          ) : null}
         </div>
       </div>
     </footer>

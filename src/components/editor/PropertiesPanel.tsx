@@ -12,9 +12,26 @@ import type {
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <label className="mb-1 block text-[11px] font-medium uppercase text-zinc-500">
+    <label className="axe-muted-label mb-1 block text-[11px] font-medium uppercase">
       {children}
     </label>
+  );
+}
+
+function PanelSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-3 rounded-lg border border-zinc-800/80 bg-[#101319]/72 p-3 shadow-sm shadow-black/10">
+      <h3 className="axe-muted-label text-[11px] font-semibold uppercase">
+        {title}
+      </h3>
+      {children}
+    </section>
   );
 }
 
@@ -45,7 +62,7 @@ function NumberInput({
         max={max}
         step={step}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="h-9 w-full rounded-lg border border-zinc-800 bg-[#11141a] px-2 font-mono text-xs text-zinc-200 outline-none focus:border-emerald-300/70"
+        className="axe-control h-9 w-full rounded-lg px-2 font-mono text-xs text-zinc-200 outline-none"
       />
     </label>
   );
@@ -123,7 +140,7 @@ function MaterialEditor({
             onChange={(event) =>
               onChange({ ...material, color: event.target.value })
             }
-            className="h-9 rounded-lg border border-zinc-800 bg-[#11141a] px-3 font-mono text-xs text-zinc-200 outline-none focus:border-emerald-300/70"
+            className="axe-control h-9 rounded-lg px-3 font-mono text-xs text-zinc-200 outline-none"
             aria-label="Material hex"
           />
         </div>
@@ -182,65 +199,73 @@ function ObjectProperties({ object }: { object: SceneObject }) {
 
   return (
     <div className="space-y-5">
-      <div>
-        <FieldLabel>Name</FieldLabel>
-        <input
-          value={object.name}
-          onChange={(event) => updateObject(object.id, { name: event.target.value })}
-          className="h-10 w-full rounded-lg border border-zinc-800 bg-[#11141a] px-3 text-sm text-zinc-100 outline-none focus:border-emerald-300/70"
+      <PanelSection title="Identity">
+        <div>
+          <FieldLabel>Name</FieldLabel>
+          <input
+            value={object.name}
+            onChange={(event) =>
+              updateObject(object.id, { name: event.target.value })
+            }
+            className="axe-control h-10 w-full rounded-lg px-3 text-sm text-zinc-100 outline-none"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <label className="flex h-10 items-center justify-between rounded-lg border border-zinc-800 bg-[#11141a] px-3 text-sm text-zinc-300">
+            Visible
+            <input
+              type="checkbox"
+              checked={object.visible}
+              onChange={(event) =>
+                updateObject(object.id, { visible: event.target.checked })
+              }
+              className="h-4 w-4 accent-emerald-300"
+            />
+          </label>
+          <label className="flex h-10 items-center justify-between rounded-lg border border-zinc-800 bg-[#11141a] px-3 text-sm text-zinc-300">
+            Locked
+            <input
+              type="checkbox"
+              checked={object.locked}
+              onChange={(event) =>
+                updateObject(object.id, { locked: event.target.checked })
+              }
+              className="h-4 w-4 accent-emerald-300"
+            />
+          </label>
+        </div>
+      </PanelSection>
+
+      <PanelSection title="Transform">
+        <VectorEditor
+          label="Position"
+          value={object.position}
+          onChange={(value) => updateVector("position", value)}
         />
-      </div>
+        <VectorEditor
+          label="Rotation"
+          value={object.rotation}
+          rotation
+          onChange={(value) => updateVector("rotation", value)}
+        />
+        <VectorEditor
+          label="Scale"
+          value={object.scale}
+          min={0.05}
+          onChange={(value) => updateVector("scale", value)}
+        />
+      </PanelSection>
 
-      <div className="grid grid-cols-2 gap-2">
-        <label className="flex h-10 items-center justify-between rounded-lg border border-zinc-800 bg-[#11141a] px-3 text-sm text-zinc-300">
-          Visible
-          <input
-            type="checkbox"
-            checked={object.visible}
-            onChange={(event) =>
-              updateObject(object.id, { visible: event.target.checked })
-            }
-            className="h-4 w-4 accent-emerald-300"
-          />
-        </label>
-        <label className="flex h-10 items-center justify-between rounded-lg border border-zinc-800 bg-[#11141a] px-3 text-sm text-zinc-300">
-          Locked
-          <input
-            type="checkbox"
-            checked={object.locked}
-            onChange={(event) =>
-              updateObject(object.id, { locked: event.target.checked })
-            }
-            className="h-4 w-4 accent-emerald-300"
-          />
-        </label>
-      </div>
-
-      <VectorEditor
-        label="Position"
-        value={object.position}
-        onChange={(value) => updateVector("position", value)}
-      />
-      <VectorEditor
-        label="Rotation"
-        value={object.rotation}
-        rotation
-        onChange={(value) => updateVector("rotation", value)}
-      />
-      <VectorEditor
-        label="Scale"
-        value={object.scale}
-        min={0.05}
-        onChange={(value) => updateVector("scale", value)}
-      />
-
-      <MaterialEditor
-        material={object.material}
-        onChange={(material) => updateObject(object.id, { material })}
-      />
+      <PanelSection title="Material">
+        <MaterialEditor
+          material={object.material}
+          onChange={(material) => updateObject(object.id, { material })}
+        />
+      </PanelSection>
 
       {object.type === "model" ? (
-        <div>
+        <PanelSection title="Asset">
           <FieldLabel>Model URL</FieldLabel>
           <textarea
             value={object.modelUrl ?? ""}
@@ -248,26 +273,25 @@ function ObjectProperties({ object }: { object: SceneObject }) {
               updateObject(object.id, { modelUrl: event.target.value })
             }
             rows={3}
-            className="w-full resize-none rounded-lg border border-zinc-800 bg-[#11141a] px-3 py-2 font-mono text-xs text-zinc-200 outline-none focus:border-emerald-300/70"
+            className="axe-control w-full resize-none rounded-lg px-3 py-2 font-mono text-xs text-zinc-200 outline-none"
           />
-        </div>
+        </PanelSection>
       ) : null}
 
-      <div>
-        <FieldLabel>Keyframes</FieldLabel>
+      <PanelSection title="Keyframes">
         <div className="grid grid-cols-3 gap-2">
           {(["position", "rotation", "scale"] as KeyframeChannel[]).map((channel) => (
             <button
               key={channel}
               type="button"
               onClick={() => addKeyframe(object.id, channel)}
-              className="h-9 rounded-lg border border-zinc-800 bg-[#11141a] text-xs capitalize text-zinc-300 hover:border-emerald-300/60 hover:text-zinc-50"
+              className="h-9 rounded-lg border border-zinc-800 bg-[#11141a] text-xs capitalize text-zinc-300 hover:border-emerald-300/60 hover:bg-[#171b22] hover:text-zinc-50"
             >
               {channel}
             </button>
           ))}
         </div>
-      </div>
+      </PanelSection>
 
       <button
         type="button"
@@ -288,97 +312,100 @@ function UiBlockProperties({ block }: { block: UiBlock }) {
 
   return (
     <div className="space-y-5">
-      <div>
-        <FieldLabel>Label</FieldLabel>
-        <input
-          value={block.label}
-          onChange={(event) =>
-            updateUiBlock(block.id, { label: event.target.value })
-          }
-          className="h-10 w-full rounded-lg border border-zinc-800 bg-[#11141a] px-3 text-sm text-zinc-100 outline-none focus:border-amber-300/70"
-        />
-      </div>
-
-      <div>
-        <FieldLabel>Anchor</FieldLabel>
-        <select
-          value={block.anchorObjectId ?? ""}
-          onChange={(event) =>
-            updateUiBlock(block.id, {
-              anchorObjectId: event.target.value || null,
-            })
-          }
-          className="h-10 w-full rounded-lg border border-zinc-800 bg-[#11141a] px-3 text-sm text-zinc-100 outline-none focus:border-amber-300/70"
-        >
-          <option value="">Screen overlay</option>
-          {objects.map((object) => (
-            <option key={object.id} value={object.id}>
-              {object.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div>
-        <FieldLabel>Position</FieldLabel>
-        <div className="grid grid-cols-2 gap-2">
-          <NumberInput
-            label="x"
-            value={block.position.x}
-            min={0}
-            max={100}
-            step={1}
-            onChange={(value) =>
-              updateUiBlock(block.id, {
-                position: { ...block.position, x: value },
-              })
+      <PanelSection title="Content">
+        <div>
+          <FieldLabel>Label</FieldLabel>
+          <input
+            value={block.label}
+            onChange={(event) =>
+              updateUiBlock(block.id, { label: event.target.value })
             }
-          />
-          <NumberInput
-            label="y"
-            value={block.position.y}
-            min={0}
-            max={100}
-            step={1}
-            onChange={(value) =>
-              updateUiBlock(block.id, {
-                position: { ...block.position, y: value },
-              })
-            }
+            className="axe-control h-10 w-full rounded-lg px-3 text-sm text-zinc-100 outline-none focus:border-amber-300/70"
           />
         </div>
-      </div>
 
-      <div>
-        <FieldLabel>Size</FieldLabel>
-        <div className="grid grid-cols-2 gap-2">
-          <NumberInput
-            label="w"
-            value={block.size.width}
-            min={40}
-            step={4}
-            onChange={(value) =>
+        <div>
+          <FieldLabel>Anchor</FieldLabel>
+          <select
+            value={block.anchorObjectId ?? ""}
+            onChange={(event) =>
               updateUiBlock(block.id, {
-                size: { ...block.size, width: value },
+                anchorObjectId: event.target.value || null,
               })
             }
-          />
-          <NumberInput
-            label="h"
-            value={block.size.height}
-            min={24}
-            step={4}
-            onChange={(value) =>
-              updateUiBlock(block.id, {
-                size: { ...block.size, height: value },
-              })
-            }
-          />
+            className="axe-control h-10 w-full rounded-lg px-3 text-sm text-zinc-100 outline-none focus:border-amber-300/70"
+          >
+            <option value="">Screen overlay</option>
+            {objects.map((object) => (
+              <option key={object.id} value={object.id}>
+                {object.name}
+              </option>
+            ))}
+          </select>
         </div>
-      </div>
+      </PanelSection>
 
-      <div>
-        <FieldLabel>Style</FieldLabel>
+      <PanelSection title="Layout">
+        <div>
+          <FieldLabel>Position</FieldLabel>
+          <div className="grid grid-cols-2 gap-2">
+            <NumberInput
+              label="x"
+              value={block.position.x}
+              min={0}
+              max={100}
+              step={1}
+              onChange={(value) =>
+                updateUiBlock(block.id, {
+                  position: { ...block.position, x: value },
+                })
+              }
+            />
+            <NumberInput
+              label="y"
+              value={block.position.y}
+              min={0}
+              max={100}
+              step={1}
+              onChange={(value) =>
+                updateUiBlock(block.id, {
+                  position: { ...block.position, y: value },
+                })
+              }
+            />
+          </div>
+        </div>
+
+        <div>
+          <FieldLabel>Size</FieldLabel>
+          <div className="grid grid-cols-2 gap-2">
+            <NumberInput
+              label="w"
+              value={block.size.width}
+              min={40}
+              step={4}
+              onChange={(value) =>
+                updateUiBlock(block.id, {
+                  size: { ...block.size, width: value },
+                })
+              }
+            />
+            <NumberInput
+              label="h"
+              value={block.size.height}
+              min={24}
+              step={4}
+              onChange={(value) =>
+                updateUiBlock(block.id, {
+                  size: { ...block.size, height: value },
+                })
+              }
+            />
+          </div>
+        </div>
+      </PanelSection>
+
+      <PanelSection title="Style">
         <div className="grid grid-cols-2 gap-2">
           <input
             type="color"
@@ -403,34 +430,34 @@ function UiBlockProperties({ block }: { block: UiBlock }) {
             aria-label="Background color"
           />
         </div>
-      </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <NumberInput
-          label="font"
-          value={block.style.fontSize}
-          min={10}
-          max={56}
-          step={1}
-          onChange={(value) =>
-            updateUiBlock(block.id, {
-              style: { ...block.style, fontSize: value },
-            })
-          }
-        />
-        <NumberInput
-          label="radius"
-          value={block.style.radius}
-          min={0}
-          max={24}
-          step={1}
-          onChange={(value) =>
-            updateUiBlock(block.id, {
-              style: { ...block.style, radius: value },
-            })
-          }
-        />
-      </div>
+        <div className="grid grid-cols-2 gap-2">
+          <NumberInput
+            label="font"
+            value={block.style.fontSize}
+            min={10}
+            max={56}
+            step={1}
+            onChange={(value) =>
+              updateUiBlock(block.id, {
+                style: { ...block.style, fontSize: value },
+              })
+            }
+          />
+          <NumberInput
+            label="radius"
+            value={block.style.radius}
+            min={0}
+            max={24}
+            step={1}
+            onChange={(value) =>
+              updateUiBlock(block.id, {
+                style: { ...block.style, radius: value },
+              })
+            }
+          />
+        </div>
+      </PanelSection>
 
       <button
         type="button"
@@ -471,19 +498,26 @@ export function PropertiesPanel() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="border-b border-zinc-800/90 px-4 py-3">
-        <h2 className="text-sm font-semibold text-zinc-100">Properties</h2>
-        <p className="mt-1 truncate text-xs text-zinc-500">
-          {selectedObject?.name ?? selectedBlock?.label ?? "Nothing selected"}
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-zinc-100">Properties</h2>
+            <p className="mt-1 truncate text-xs text-zinc-500">
+              {selectedObject?.name ?? selectedBlock?.label ?? "Nothing selected"}
+            </p>
+          </div>
+          <span className="rounded-md border border-zinc-800 px-2 py-1 text-[11px] uppercase text-zinc-500">
+            {selectedObject ? selectedObject.type : selectedBlock ? selectedBlock.type : "Idle"}
+          </span>
+        </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+      <div className="axe-scrollbar-thin min-h-0 flex-1 overflow-y-auto p-4">
         {selectedObject ? <ObjectProperties object={selectedObject} /> : null}
         {!selectedObject && selectedBlock ? (
           <UiBlockProperties block={selectedBlock} />
         ) : null}
         {!selectedObject && !selectedBlock ? (
-          <div className="rounded-lg border border-dashed border-zinc-800 p-5 text-sm text-zinc-500">
+          <div className="rounded-lg border border-dashed border-zinc-800 bg-[#101319]/50 p-5 text-sm text-zinc-500">
             Select an object or UI block.
           </div>
         ) : null}

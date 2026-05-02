@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Box,
@@ -9,6 +9,7 @@ import {
   EyeOff,
   MousePointerClick,
   Plus,
+  Search,
   Square,
   Trash2,
   Type,
@@ -36,6 +37,7 @@ function ObjectIcon({ type }: { type: SceneObjectType }) {
 
 export function SceneHierarchy() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [query, setQuery] = useState("");
   const objects = useEditorStore((state) => state.objects);
   const uiBlocks = useEditorStore((state) => state.uiBlocks);
   const selectedObjectId = useEditorStore((state) => state.selectedObjectId);
@@ -47,6 +49,17 @@ export function SceneHierarchy() {
   const addUiBlock = useEditorStore((state) => state.addUiBlock);
   const selectUiBlock = useEditorStore((state) => state.selectUiBlock);
   const deleteUiBlock = useEditorStore((state) => state.deleteUiBlock);
+  const filteredObjects = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    if (!normalizedQuery) {
+      return objects;
+    }
+
+    return objects.filter((object) =>
+      `${object.name} ${object.type}`.toLowerCase().includes(normalizedQuery),
+    );
+  }, [objects, query]);
 
   function handleUpload(file: File | undefined) {
     if (!file) {
@@ -67,7 +80,7 @@ export function SceneHierarchy() {
     <div className="flex h-full min-h-0 flex-col">
       <div className="border-b border-zinc-800/90 p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-xs font-semibold uppercase text-zinc-500">
+          <h2 className="axe-muted-label text-xs font-semibold uppercase">
             Scene
           </h2>
           <span className="font-mono text-[11px] text-zinc-600">
@@ -81,7 +94,7 @@ export function SceneHierarchy() {
               key={type}
               type="button"
               onClick={() => addObject(type)}
-              className="flex h-16 flex-col items-center justify-center gap-1 rounded-lg border border-zinc-800 bg-[#12151b] text-xs text-zinc-300 hover:border-emerald-300/60 hover:text-zinc-50"
+              className="flex h-16 flex-col items-center justify-center gap-1 rounded-lg border border-zinc-800 bg-[#12151b] text-xs text-zinc-300 shadow-sm shadow-black/20 hover:border-emerald-300/60 hover:bg-[#171b22] hover:text-zinc-50"
             >
               <Icon className="h-4 w-4" />
               {label}
@@ -102,16 +115,29 @@ export function SceneHierarchy() {
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="mt-2 flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-[#12151b] text-sm text-zinc-300 hover:border-emerald-300/60 hover:text-zinc-50"
+          className="mt-2 flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-[#12151b] text-sm text-zinc-300 shadow-sm shadow-black/20 hover:border-emerald-300/60 hover:bg-[#171b22] hover:text-zinc-50"
         >
           <Upload className="h-4 w-4" />
           Import GLB
         </button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+      <div className="border-b border-zinc-900/80 p-3">
+        <label className="axe-control flex h-9 items-center gap-2 rounded-lg px-3">
+          <Search className="h-4 w-4 text-zinc-500" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search layers"
+            className="min-w-0 flex-1 bg-transparent text-sm text-zinc-200 outline-none placeholder:text-zinc-600"
+            aria-label="Search scene objects"
+          />
+        </label>
+      </div>
+
+      <div className="axe-scrollbar-thin min-h-0 flex-1 overflow-y-auto p-3">
         <AnimatePresence initial={false}>
-          {objects.map((object) => {
+          {filteredObjects.map((object) => {
             const selected = selectedObjectId === object.id;
 
             return (
@@ -120,10 +146,10 @@ export function SceneHierarchy() {
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
-                className={`group mb-2 flex h-11 items-center gap-2 rounded-lg border px-2 ${
+                className={`group mb-2 flex h-11 items-center gap-2 rounded-lg border px-2 shadow-sm shadow-black/10 ${
                   selected
                     ? "border-emerald-300/70 bg-emerald-300/10"
-                    : "border-zinc-800 bg-[#11141a] hover:border-zinc-700"
+                    : "border-zinc-800 bg-[#11141a] hover:border-zinc-700 hover:bg-[#151922]"
                 }`}
               >
                 <button
@@ -132,7 +158,7 @@ export function SceneHierarchy() {
                   className="flex min-w-0 flex-1 items-center gap-2 text-left"
                 >
                   <span
-                    className="flex h-7 w-7 items-center justify-center rounded-md border border-zinc-800"
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-zinc-800 bg-black/15"
                     style={{ color: object.material.color }}
                   >
                     <ObjectIcon type={object.type} />
@@ -173,11 +199,16 @@ export function SceneHierarchy() {
             );
           })}
         </AnimatePresence>
+        {filteredObjects.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-zinc-800 px-3 py-6 text-center text-sm text-zinc-500">
+            No matching layers
+          </div>
+        ) : null}
       </div>
 
       <div className="border-t border-zinc-800/90 p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-xs font-semibold uppercase text-zinc-500">
+          <h2 className="axe-muted-label text-xs font-semibold uppercase">
             UI Blocks
           </h2>
           <div className="flex gap-1">
@@ -185,7 +216,7 @@ export function SceneHierarchy() {
               title="Add text"
               type="button"
               onClick={() => addUiBlock("text")}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-800 text-zinc-300 hover:bg-zinc-800"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-50"
             >
               <Type className="h-4 w-4" />
             </button>
@@ -193,21 +224,21 @@ export function SceneHierarchy() {
               title="Add button"
               type="button"
               onClick={() => addUiBlock("button")}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-800 text-zinc-300 hover:bg-zinc-800"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-50"
             >
               <Plus className="h-4 w-4" />
             </button>
           </div>
         </div>
 
-        <div className="space-y-2">
+        <div className="axe-scrollbar-thin max-h-36 space-y-2 overflow-y-auto pr-1">
           {uiBlocks.map((block) => (
             <div
               key={block.id}
-              className={`flex h-10 items-center gap-2 rounded-lg border px-2 ${
+              className={`flex h-10 items-center gap-2 rounded-lg border px-2 shadow-sm shadow-black/10 ${
                 selectedUiBlockId === block.id
                   ? "border-amber-300/70 bg-amber-300/10"
-                  : "border-zinc-800 bg-[#11141a]"
+                  : "border-zinc-800 bg-[#11141a] hover:bg-[#151922]"
               }`}
             >
               <button
@@ -228,6 +259,11 @@ export function SceneHierarchy() {
               </button>
             </div>
           ))}
+          {uiBlocks.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-zinc-800 px-3 py-4 text-center text-sm text-zinc-500">
+              No UI blocks
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

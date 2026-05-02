@@ -65,6 +65,12 @@ export function Toolbar() {
     () => (userEmail ? userEmail.split("@")[0] : "Guest"),
     [userEmail],
   );
+  const apiStatusLabel =
+    apiStatus === "online"
+      ? "API online"
+      : apiStatus === "offline"
+        ? "Offline mode"
+        : "Checking API";
 
   const refreshProjects = useCallback(async () => {
     const nextProjects = await listProjects(authToken);
@@ -100,6 +106,10 @@ export function Toolbar() {
   }, [authToken, refreshProjects]);
 
   async function handleSave() {
+    if (busy) {
+      return;
+    }
+
     setBusy("save");
     setStatus("Saving project");
     const scene = { ...serializeScene(), id: projectId, name: projectName };
@@ -118,6 +128,10 @@ export function Toolbar() {
   }
 
   async function handleLoad(id = projectId) {
+    if (busy) {
+      return;
+    }
+
     setBusy("load");
     setStatus("Loading project");
 
@@ -134,6 +148,10 @@ export function Toolbar() {
   }
 
   async function handleAuth(mode: "login" | "register") {
+    if (busy) {
+      return;
+    }
+
     setBusy("auth");
     setStatus(mode === "login" ? "Signing in" : "Creating account");
 
@@ -151,28 +169,28 @@ export function Toolbar() {
   }
 
   return (
-    <header className="grid min-w-0 grid-cols-[286px_1fr_360px] border-b border-zinc-800/90 bg-[#0b0c10]">
-      <div className="flex items-center gap-3 border-r border-zinc-800/90 px-4">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-300/25 bg-emerald-300/10 font-semibold text-emerald-200">
+    <header className="grid min-w-0 grid-cols-[272px_minmax(0,1fr)_328px] border-b border-zinc-800/90 bg-[#0b0c10]/95 shadow-sm shadow-black/30">
+      <div className="flex min-w-0 items-center gap-3 border-r border-zinc-800/90 px-4">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-emerald-300/30 bg-emerald-300/10 font-semibold text-emerald-200 shadow-inner shadow-emerald-300/10">
           A
         </div>
         <div className="min-w-0">
-          <div className="text-sm font-semibold text-zinc-50">Axe</div>
-          <div className="text-xs text-zinc-500">3D Web Builder</div>
+          <div className="truncate text-sm font-semibold text-zinc-50">Axe</div>
+          <div className="truncate text-xs text-zinc-500">3D Web Builder</div>
         </div>
       </div>
 
-      <div className="flex min-w-0 items-center gap-3 px-4">
-        <div className="flex h-9 overflow-hidden rounded-lg border border-zinc-800 bg-[#11141a]">
+      <div className="axe-scrollbar-none flex min-w-0 items-center gap-2 overflow-x-auto px-4">
+        <div className="flex h-9 shrink-0 overflow-hidden rounded-lg border border-zinc-800 bg-[#11141a] shadow-sm shadow-black/20">
           {modeButtons.map(({ mode, title, icon: Icon }) => (
             <button
               key={mode}
               title={title}
               type="button"
               onClick={() => setTransformMode(mode)}
-              className={`flex h-9 w-10 items-center justify-center border-r border-zinc-800 last:border-r-0 ${
+              className={`flex h-9 w-9 items-center justify-center border-r border-zinc-800 last:border-r-0 ${
                 transformMode === mode
-                  ? "bg-emerald-300 text-[#06110e]"
+                  ? "bg-emerald-300 text-[#06110e] shadow-inner shadow-white/20"
                   : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
               }`}
             >
@@ -181,13 +199,13 @@ export function Toolbar() {
           ))}
         </div>
 
-        <div className="flex h-9 overflow-hidden rounded-lg border border-zinc-800 bg-[#11141a]">
+        <div className="flex h-9 shrink-0 overflow-hidden rounded-lg border border-zinc-800 bg-[#11141a] shadow-sm shadow-black/20">
           <button
             title="Undo"
             type="button"
             disabled={!canUndo}
             onClick={undo}
-            className="flex h-9 w-10 items-center justify-center border-r border-zinc-800 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-35"
+            className="flex h-9 w-9 items-center justify-center border-r border-zinc-800 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-35"
           >
             <Undo2 className="h-4 w-4" />
           </button>
@@ -196,7 +214,7 @@ export function Toolbar() {
             type="button"
             disabled={!canRedo}
             onClick={redo}
-            className="flex h-9 w-10 items-center justify-center text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-35"
+            className="flex h-9 w-9 items-center justify-center text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-35"
           >
             <Redo2 className="h-4 w-4" />
           </button>
@@ -207,7 +225,7 @@ export function Toolbar() {
           onChange={(event) => {
             setProjectMeta(projectId, event.target.value);
           }}
-          className="h-9 w-52 rounded-lg border border-zinc-800 bg-[#11141a] px-3 text-sm text-zinc-100 outline-none focus:border-emerald-300/70"
+          className="axe-control h-9 w-40 rounded-lg px-3 text-sm outline-none"
           aria-label="Project name"
         />
         <input
@@ -215,7 +233,7 @@ export function Toolbar() {
           onChange={(event) => {
             setProjectMeta(event.target.value, projectName);
           }}
-          className="h-9 w-40 rounded-lg border border-zinc-800 bg-[#11141a] px-3 font-mono text-xs text-zinc-300 outline-none focus:border-emerald-300/70"
+          className="axe-control h-9 w-32 rounded-lg px-3 font-mono text-xs text-zinc-300 outline-none"
           aria-label="Project id"
         />
         <select
@@ -226,7 +244,8 @@ export function Toolbar() {
               void handleLoad(event.target.value);
             }
           }}
-          className="h-9 w-36 rounded-lg border border-zinc-800 bg-[#11141a] px-2 text-xs text-zinc-300 outline-none focus:border-emerald-300/70"
+          disabled={busy !== null}
+          className="axe-control h-9 w-32 rounded-lg px-2 text-xs text-zinc-300 outline-none disabled:opacity-50"
           aria-label="Recent projects"
           title="Recent projects"
         >
@@ -242,7 +261,8 @@ export function Toolbar() {
           title="Save"
           type="button"
           onClick={handleSave}
-          className="flex h-9 items-center gap-2 rounded-lg bg-emerald-300 px-3 text-sm font-medium text-[#06110e] hover:bg-emerald-200"
+          disabled={busy !== null}
+          className="flex h-9 shrink-0 items-center gap-2 rounded-lg bg-emerald-300 px-3 text-sm font-medium text-[#06110e] shadow-sm shadow-emerald-950/40 hover:bg-emerald-200 disabled:opacity-60"
         >
           {busy === "save" ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -255,24 +275,25 @@ export function Toolbar() {
           title="Load"
           type="button"
           onClick={() => handleLoad()}
-          className="flex h-9 items-center gap-2 rounded-lg border border-zinc-800 px-3 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
+          disabled={busy !== null}
+          aria-label="Load"
+          className="flex h-9 w-10 shrink-0 items-center justify-center rounded-lg border border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-60"
         >
           {busy === "load" ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <FolderOpen className="h-4 w-4" />
           )}
-          Load
         </button>
         <button
           title="Export JSON"
           type="button"
           onClick={() => exportProject(serializeScene())}
-          className="flex h-9 items-center justify-center rounded-lg border border-zinc-800 px-3 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
+          className="flex h-9 w-10 shrink-0 items-center justify-center rounded-lg border border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
         >
           <Download className="h-4 w-4" />
         </button>
-        <div className="flex min-w-0 flex-1 items-center gap-2 truncate text-xs text-zinc-500">
+        <div className="flex min-w-20 flex-1 items-center gap-2 truncate rounded-lg border border-transparent px-1 text-xs text-zinc-500">
           <span
             className={`h-2 w-2 shrink-0 rounded-full ${
               apiStatus === "online"
@@ -282,30 +303,35 @@ export function Toolbar() {
                   : "bg-amber-300"
             }`}
           />
+          <span className="hidden shrink-0 text-zinc-400 xl:inline">{apiStatusLabel}</span>
+          <span className="hidden h-3 w-px shrink-0 bg-zinc-800 xl:block" />
           <span className="truncate">{status}</span>
         </div>
       </div>
 
-      <div className="flex items-center gap-2 border-l border-zinc-800/90 px-4">
-        <div className="mr-1 max-w-24 truncate text-xs text-zinc-500">{signedInLabel}</div>
+      <div className="flex min-w-0 items-center gap-2 border-l border-zinc-800/90 px-4">
+        <div className="mr-1 hidden max-w-20 truncate text-xs text-zinc-500 2xl:block">
+          {signedInLabel}
+        </div>
         <input
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          className="h-9 min-w-0 flex-1 rounded-lg border border-zinc-800 bg-[#11141a] px-3 text-xs text-zinc-200 outline-none focus:border-emerald-300/70"
+          className="axe-control h-9 min-w-0 flex-1 rounded-lg px-3 text-xs text-zinc-200 outline-none"
           aria-label="Email"
         />
         <input
           value={password}
           type="password"
           onChange={(event) => setPassword(event.target.value)}
-          className="h-9 w-24 rounded-lg border border-zinc-800 bg-[#11141a] px-3 text-xs text-zinc-200 outline-none focus:border-emerald-300/70"
+          className="axe-control h-9 w-24 rounded-lg px-3 text-xs text-zinc-200 outline-none"
           aria-label="Password"
         />
         <button
           title="Register"
           type="button"
           onClick={() => handleAuth("register")}
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
+          disabled={busy !== null}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-60"
         >
           {busy === "auth" ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -317,7 +343,8 @@ export function Toolbar() {
           title="Login"
           type="button"
           onClick={() => handleAuth("login")}
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
+          disabled={busy !== null}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-60"
         >
           <LogIn className="h-4 w-4" />
         </button>
