@@ -1,10 +1,16 @@
 "use client";
 
-import { Suspense, useMemo, useRef } from "react";
+import {
+  Component,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { Canvas } from "@react-three/fiber";
 import {
   ContactShadows,
-  Environment,
   GizmoHelper,
   GizmoViewport,
   Grid,
@@ -14,7 +20,38 @@ import {
 import gsap from "gsap";
 import { SceneObjectMesh } from "@/components/three/SceneObjectMesh";
 import { useEditorStore } from "@/store/editor-store";
-import type { UiBlock } from "@/lib/scene";
+import { getSceneObjectsAtTime, type SceneObject, type UiBlock } from "@/lib/scene";
+
+class CanvasErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: Error | null }
+> {
+  state = { error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="flex h-full w-full items-center justify-center bg-[#090a0d] px-8 text-center">
+          <div className="max-w-md rounded-lg border border-rose-400/30 bg-[#0d0f13] p-6 shadow-2xl shadow-black/40">
+            <h2 className="text-base font-semibold text-rose-100">
+              Canvas failed to render
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-zinc-400">
+              The editor is still running. Remove the last imported asset or
+              reload the project to recover the scene.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 function UiBlockView({
   block,
@@ -53,8 +90,7 @@ function UiBlockView({
   );
 }
 
-function AnchoredUiBlocks() {
-  const objects = useEditorStore((state) => state.objects);
+function AnchoredUiBlocks({ objects }: { objects: SceneObject[] }) {
   const uiBlocks = useEditorStore((state) => state.uiBlocks);
   const selectedUiBlockId = useEditorStore((state) => state.selectedUiBlockId);
   const selectUiBlock = useEditorStore((state) => state.selectUiBlock);
@@ -148,6 +184,7 @@ function CanvasHud() {
 
 export function EditorCanvas() {
   const objects = useEditorStore((state) => state.objects);
+  const keyframes = useEditorStore((state) => state.keyframes);
   const selectObject = useEditorStore((state) => state.selectObject);
   const selectUiBlock = useEditorStore((state) => state.selectUiBlock);
   const currentTime = useEditorStore((state) => state.currentTime);
@@ -157,11 +194,27 @@ export function EditorCanvas() {
   );
   const setCurrentTime = useEditorStore((state) => state.setCurrentTime);
   const scrollDriver = useRef({ value: currentTime });
+  const [webglSupported, setWebglSupported] = useState<boolean | null>(null);
 
-  const visibleObjects = useMemo(
-    () => objects.filter((object) => object.visible),
-    [objects],
+  const animatedObjects = useMemo(
+    () => getSceneObjectsAtTime(objects, keyframes, currentTime),
+    [objects, keyframes, currentTime],
   );
+  const visibleObjects = useMemo(
+    () => animatedObjects.filter((object) => object.visible),
+    [animatedObjects],
+  );
+
+  useEffect(() => {
+    const canvas = document.createElement("canvas");
+    const context =
+      canvas.getContext("webgl2") ?? canvas.getContext("webgl");
+    const timer = window.setTimeout(() => {
+      setWebglSupported(Boolean(context));
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, []);
 
   function handleWheel(event: React.WheelEvent<HTMLDivElement>) {
     if (!scrollAnimationEnabled) {
@@ -190,61 +243,74 @@ export function EditorCanvas() {
       onWheel={handleWheel}
       onPointerDown={() => selectUiBlock(null)}
     >
-      <Canvas
-        shadows
-        dpr={[1, 2]}
-        camera={{ position: [4, 3, 5], fov: 46, near: 0.1, far: 200 }}
-        gl={{ antialias: true, preserveDrawingBuffer: true }}
-        onPointerMissed={() => selectObject(null)}
-      >
-        <color attach="background" args={["#090a0d"]} />
-        <fog attach="fog" args={["#090a0d", 12, 24]} />
-        <ambientLight intensity={0.56} />
-        <directionalLight
-          castShadow
-          position={[4, 7, 3]}
-          intensity={1.35}
-          shadow-mapSize={[1024, 1024]}
-        />
-        <Suspense
-          fallback={
-            <Html center>
-              <div className="rounded-lg border border-zinc-800 bg-[#0d0f13] px-3 py-2 text-xs text-zinc-400">
-                Loading asset
-              </div>
-            </Html>
-          }
-        >
-          {visibleObjects.map((object) => (
-            <SceneObjectMesh key={object.id} object={object} />
-          ))}
-          <AnchoredUiBlocks />
-          <Environment preset="city" />
-        </Suspense>
-        <Grid
-          args={[20, 20]}
-          cellSize={0.5}
-          cellThickness={0.5}
-          cellColor="#2a2f38"
-          sectionSize={2}
-          sectionThickness={1.1}
-          sectionColor="#454d5a"
-          fadeDistance={22}
-          fadeStrength={1}
-          infiniteGrid
-        />
-        <ContactShadows
-          position={[0, -0.03, 0]}
-          opacity={0.35}
-          scale={10}
-          blur={2.5}
-          far={4}
-        />
-        <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
-        <GizmoHelper alignment="bottom-right" margin={[76, 76]}>
-          <GizmoViewport axisColors={["#f77f9a", "#24d6a3", "#8ea0ff"]} />
-        </GizmoHelper>
-      </Canvas>
+      {webglSupported === null ? (
+        <div className="flex h-full w-full items-center justify-center bg-[#090a0d] text-sm text-zinc-400">
+          Checking WebGL
+        </div>
+      ) : webglSupported === false ? (
+        <div className="flex h-full w-full items-center justify-center bg-[#090a0d] px-8 text-center">
+          <div className="max-w-md rounded-lg border border-zinc-800 bg-[#0d0f13] p-6 shadow-2xl shadow-black/40">
+            <h2 className="text-base font-semibold text-zinc-100">
+              WebGL is unavailable
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-zinc-400">
+              Axe needs WebGL to render the 3D editor. Enable hardware
+              acceleration or open the app in a browser with WebGL support.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <CanvasErrorBoundary>
+          <Canvas
+            shadows
+            dpr={[1, 1.5]}
+            camera={{ position: [4, 3, 5], fov: 46, near: 0.1, far: 200 }}
+            gl={{ antialias: true, preserveDrawingBuffer: true }}
+            onPointerMissed={() => selectObject(null)}
+          >
+            <color attach="background" args={["#090a0d"]} />
+            <fog attach="fog" args={["#090a0d", 12, 24]} />
+            <ambientLight intensity={0.56} />
+            <directionalLight
+              castShadow
+              position={[4, 7, 3]}
+              intensity={1.35}
+              shadow-mapSize={[1024, 1024]}
+            />
+            <hemisphereLight
+              args={["#d7fff5", "#12151b", 0.48]}
+              position={[0, 4, 0]}
+            />
+            {visibleObjects.map((object) => (
+              <SceneObjectMesh key={object.id} object={object} />
+            ))}
+            <AnchoredUiBlocks objects={animatedObjects} />
+            <Grid
+              args={[20, 20]}
+              cellSize={0.5}
+              cellThickness={0.5}
+              cellColor="#2a2f38"
+              sectionSize={2}
+              sectionThickness={1.1}
+              sectionColor="#454d5a"
+              fadeDistance={22}
+              fadeStrength={1}
+              infiniteGrid
+            />
+            <ContactShadows
+              position={[0, -0.03, 0]}
+              opacity={0.35}
+              scale={10}
+              blur={2.5}
+              far={4}
+            />
+            <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
+            <GizmoHelper alignment="bottom-right" margin={[76, 76]}>
+              <GizmoViewport axisColors={["#f77f9a", "#24d6a3", "#8ea0ff"]} />
+            </GizmoHelper>
+          </Canvas>
+        </CanvasErrorBoundary>
+      )}
       <ScreenUiBlocks />
       <CanvasHud />
     </div>

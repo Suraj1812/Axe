@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Download,
   FolderOpen,
@@ -15,8 +15,16 @@ import {
   UserPlus,
 } from "lucide-react";
 import { useEditorStore } from "@/store/editor-store";
-import { exportProject, loadProject, login, register, saveProject } from "@/services/projects";
-import type { TransformMode } from "@/lib/scene";
+import {
+  exportProject,
+  getApiHealth,
+  listProjects,
+  loadProject,
+  login,
+  register,
+  saveProject,
+} from "@/services/projects";
+import type { ProjectSummary, TransformMode } from "@/lib/scene";
 
 const modeButtons: Array<{
   mode: TransformMode;
@@ -44,11 +52,13 @@ export function Toolbar() {
   const canUndo = useEditorStore((state) => state.past.length > 0);
   const canRedo = useEditorStore((state) => state.future.length > 0);
 
-  const [projectInput, setProjectInput] = useState(projectId);
-  const [nameInput, setNameInput] = useState(projectName);
   const [email, setEmail] = useState(userEmail ?? "designer@axe.dev");
   const [password, setPassword] = useState("axe-studio");
   const [status, setStatus] = useState("Local state ready");
+  const [apiStatus, setApiStatus] = useState<"checking" | "online" | "offline">(
+    "checking",
+  );
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [busy, setBusy] = useState<"save" | "load" | "auth" | null>(null);
 
   const signedInLabel = useMemo(
@@ -56,15 +66,49 @@ export function Toolbar() {
     [userEmail],
   );
 
+  const refreshProjects = useCallback(async () => {
+    const nextProjects = await listProjects(authToken);
+    setProjects(nextProjects);
+  }, [authToken]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function checkApi() {
+      try {
+        await getApiHealth();
+
+        if (!cancelled) {
+          setApiStatus("online");
+        }
+      } catch {
+        if (!cancelled) {
+          setApiStatus("offline");
+        }
+      }
+    }
+
+    checkApi();
+    const refreshTimer = window.setTimeout(() => {
+      void refreshProjects();
+    }, 0);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(refreshTimer);
+    };
+  }, [authToken, refreshProjects]);
+
   async function handleSave() {
     setBusy("save");
     setStatus("Saving project");
-    const scene = { ...serializeScene(), id: projectInput, name: nameInput };
+    const scene = { ...serializeScene(), id: projectId, name: projectName };
 
     try {
       const result = await saveProject(scene, authToken);
       hydrateScene(result.project);
       setProjectMeta(result.project.id, result.project.name);
+      await refreshProjects();
       setStatus(result.source === "api" ? "Saved to API" : "Saved locally");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Save failed");
@@ -73,15 +117,14 @@ export function Toolbar() {
     }
   }
 
-  async function handleLoad() {
+  async function handleLoad(id = projectId) {
     setBusy("load");
     setStatus("Loading project");
 
     try {
-      const result = await loadProject(projectInput, authToken);
+      const result = await loadProject(id, authToken);
       hydrateScene(result.project);
-      setProjectInput(result.project.id);
-      setNameInput(result.project.name);
+      await refreshProjects();
       setStatus(result.source === "api" ? "Loaded from API" : "Loaded locally");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Load failed");
@@ -98,6 +141,7 @@ export function Toolbar() {
       const result =
         mode === "login" ? await login(email, password) : await register(email, password);
       setAuth(result.token, result.email);
+      setProjects(await listProjects(result.token));
       setStatus(mode === "login" ? "Signed in" : "Account ready");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Auth failed");
@@ -159,23 +203,40 @@ export function Toolbar() {
         </div>
 
         <input
-          value={nameInput}
+          value={projectName}
           onChange={(event) => {
-            setNameInput(event.target.value);
-            setProjectMeta(projectInput, event.target.value);
+            setProjectMeta(projectId, event.target.value);
           }}
           className="h-9 w-52 rounded-lg border border-zinc-800 bg-[#11141a] px-3 text-sm text-zinc-100 outline-none focus:border-emerald-300/70"
           aria-label="Project name"
         />
         <input
-          value={projectInput}
+          value={projectId}
           onChange={(event) => {
-            setProjectInput(event.target.value);
-            setProjectMeta(event.target.value, nameInput);
+            setProjectMeta(event.target.value, projectName);
           }}
           className="h-9 w-40 rounded-lg border border-zinc-800 bg-[#11141a] px-3 font-mono text-xs text-zinc-300 outline-none focus:border-emerald-300/70"
           aria-label="Project id"
         />
+        <select
+          value=""
+          onFocus={refreshProjects}
+          onChange={(event) => {
+            if (event.target.value) {
+              void handleLoad(event.target.value);
+            }
+          }}
+          className="h-9 w-36 rounded-lg border border-zinc-800 bg-[#11141a] px-2 text-xs text-zinc-300 outline-none focus:border-emerald-300/70"
+          aria-label="Recent projects"
+          title="Recent projects"
+        >
+          <option value="">Recent</option>
+          {projects.map((project) => (
+            <option key={project.id} value={project.id}>
+              {project.name} · {project.scope}
+            </option>
+          ))}
+        </select>
 
         <button
           title="Save"
@@ -193,7 +254,7 @@ export function Toolbar() {
         <button
           title="Load"
           type="button"
-          onClick={handleLoad}
+          onClick={() => handleLoad()}
           className="flex h-9 items-center gap-2 rounded-lg border border-zinc-800 px-3 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
         >
           {busy === "load" ? (
@@ -211,7 +272,18 @@ export function Toolbar() {
         >
           <Download className="h-4 w-4" />
         </button>
-        <div className="min-w-0 flex-1 truncate text-xs text-zinc-500">{status}</div>
+        <div className="flex min-w-0 flex-1 items-center gap-2 truncate text-xs text-zinc-500">
+          <span
+            className={`h-2 w-2 shrink-0 rounded-full ${
+              apiStatus === "online"
+                ? "bg-emerald-300"
+                : apiStatus === "offline"
+                  ? "bg-rose-300"
+                  : "bg-amber-300"
+            }`}
+          />
+          <span className="truncate">{status}</span>
+        </div>
       </div>
 
       <div className="flex items-center gap-2 border-l border-zinc-800/90 px-4">

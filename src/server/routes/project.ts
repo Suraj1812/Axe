@@ -1,35 +1,31 @@
 import { Router } from "express";
-import type { SceneDocument } from "../../lib/scene";
 import { optionalAuth, type AuthenticatedRequest } from "../middleware/auth";
-import { loadProject, saveProject } from "../services/dataStore";
+import { parseSceneDocument } from "../../lib/scene-schema";
+import { listProjects, loadProject, saveProject } from "../services/dataStore";
 
 export const projectRouter = Router();
-
-function isSceneDocument(value: unknown): value is SceneDocument {
-  const candidate = value as Partial<SceneDocument>;
-  return Boolean(
-    candidate &&
-      typeof candidate.id === "string" &&
-      typeof candidate.name === "string" &&
-      Array.isArray(candidate.objects) &&
-      Array.isArray(candidate.keyframes) &&
-      Array.isArray(candidate.uiBlocks) &&
-      typeof candidate.duration === "number",
-  );
-}
 
 projectRouter.post(
   "/project",
   optionalAuth,
   async (request: AuthenticatedRequest, response, next) => {
     try {
-      if (!isSceneDocument(request.body)) {
-        response.status(400).json({ message: "Invalid scene payload" });
-        return;
-      }
-
-      const project = await saveProject(request.body, request.user?.id ?? null);
+      const parsedProject = parseSceneDocument(request.body);
+      const project = await saveProject(parsedProject, request.user?.id ?? null);
       response.json({ project });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+projectRouter.get(
+  "/projects",
+  optionalAuth,
+  async (request: AuthenticatedRequest, response, next) => {
+    try {
+      const projects = await listProjects(request.user?.id ?? null);
+      response.json({ projects });
     } catch (error) {
       next(error);
     }

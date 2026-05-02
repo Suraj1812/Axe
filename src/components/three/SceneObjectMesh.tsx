@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { Suspense, useEffect, useMemo, useRef } from "react";
 import { Edges, TransformControls, useGLTF } from "@react-three/drei";
 import type { ThreeEvent } from "@react-three/fiber";
 import * as THREE from "three";
@@ -86,8 +86,26 @@ function PrimitiveContent({ object, selected }: { object: SceneObject; selected:
   );
 }
 
+function ModelFallback({ object, selected }: { object: SceneObject; selected: boolean }) {
+  return (
+    <PrimitiveContent
+      object={{
+        ...object,
+        type: "box",
+        material: {
+          ...object.material,
+          opacity: 0.42,
+          wireframe: true,
+        },
+      }}
+      selected={selected}
+    />
+  );
+}
+
 export function SceneObjectMesh({ object }: { object: SceneObject }) {
   const groupRef = useRef<THREE.Group | null>(null);
+  const transformStartedRef = useRef(false);
   const selectedObjectId = useEditorStore((state) => state.selectedObjectId);
   const transformMode = useEditorStore((state) => state.transformMode);
   const selectObject = useEditorStore((state) => state.selectObject);
@@ -127,7 +145,9 @@ export function SceneObjectMesh({ object }: { object: SceneObject }) {
       onPointerDown={handlePointerDown}
     >
       {object.type === "model" && object.modelUrl ? (
-        <ModelContent object={object} />
+        <Suspense fallback={<ModelFallback object={object} selected={selected} />}>
+          <ModelContent object={object} />
+        </Suspense>
       ) : (
         <PrimitiveContent object={object} selected={selected} />
       )}
@@ -138,8 +158,19 @@ export function SceneObjectMesh({ object }: { object: SceneObject }) {
     return (
       <TransformControls
         mode={transformMode}
+        onMouseDown={() => {
+          if (transformStartedRef.current) {
+            return;
+          }
+
+          transformStartedRef.current = true;
+          updateObject(object.id, {}, true);
+        }}
         onObjectChange={() => syncTransform(false)}
-        onMouseUp={() => syncTransform(false)}
+        onMouseUp={() => {
+          syncTransform(false);
+          transformStartedRef.current = false;
+        }}
         size={0.82}
       >
         {content}

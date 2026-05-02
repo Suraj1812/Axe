@@ -40,6 +40,7 @@ npm run local
 npm run lint
 npm run build
 npm run check
+npm run verify:local
 npm run start:full
 ```
 
@@ -48,6 +49,12 @@ For a production-style local run, build first, then start both the Express API a
 ```bash
 npm run build
 npm run start:full
+```
+
+In another terminal, run the local readiness check:
+
+```bash
+npm run verify:local
 ```
 
 ## API

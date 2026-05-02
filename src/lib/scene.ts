@@ -3,6 +3,15 @@ export type TransformMode = "translate" | "rotate" | "scale";
 export type Vector3Tuple = [number, number, number];
 export type KeyframeChannel = "position" | "rotation" | "scale";
 export type UiBlockType = "text" | "button";
+export type ProjectSummary = {
+  id: string;
+  name: string;
+  objectCount: number;
+  uiBlockCount: number;
+  keyframeCount: number;
+  updatedAt: string;
+  scope: "account" | "local";
+};
 
 export type MaterialConfig = {
   color: string;
@@ -261,4 +270,70 @@ export function lerpTuple(
     from[1] + (to[1] - from[1]) * progress,
     from[2] + (to[2] - from[2]) * progress,
   ];
+}
+
+export function getSceneObjectsAtTime(
+  objects: SceneObject[],
+  keyframes: SceneKeyframe[],
+  time: number,
+) {
+  return objects.map((object) => {
+    const patch: Partial<SceneObject> = {};
+
+    (["position", "rotation", "scale"] as KeyframeChannel[]).forEach(
+      (channel) => {
+        const frames = keyframes
+          .filter(
+            (frame) => frame.objectId === object.id && frame.channel === channel,
+          )
+          .sort((a, b) => a.time - b.time);
+
+        if (frames.length === 0) {
+          return;
+        }
+
+        const first = frames[0];
+        const last = frames[frames.length - 1];
+
+        if (time <= first.time) {
+          patch[channel] = first.value;
+          return;
+        }
+
+        if (time >= last.time) {
+          patch[channel] = last.value;
+          return;
+        }
+
+        const nextIndex = frames.findIndex((frame) => frame.time >= time);
+        const prev = frames[nextIndex - 1];
+        const next = frames[nextIndex];
+        const span = Math.max(next.time - prev.time, 0.001);
+        const rawProgress = clamp((time - prev.time) / span, 0, 1);
+        const eased =
+          next.easing === "power2.out"
+            ? 1 - Math.pow(1 - rawProgress, 2)
+            : rawProgress;
+
+        patch[channel] = lerpTuple(prev.value, next.value, eased);
+      },
+    );
+
+    return Object.keys(patch).length > 0 ? { ...object, ...patch } : object;
+  });
+}
+
+export function createProjectSummary(
+  project: SceneDocument,
+  scope: ProjectSummary["scope"],
+): ProjectSummary {
+  return {
+    id: project.id,
+    name: project.name,
+    objectCount: project.objects.length,
+    uiBlockCount: project.uiBlocks.length,
+    keyframeCount: project.keyframes.length,
+    updatedAt: project.updatedAt,
+    scope,
+  };
 }

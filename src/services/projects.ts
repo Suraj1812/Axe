@@ -1,4 +1,9 @@
-import type { SceneDocument } from "@/lib/scene";
+import {
+  createProjectSummary,
+  type ProjectSummary,
+  type SceneDocument,
+} from "@/lib/scene";
+import { parseSceneDocument } from "@/lib/scene-schema";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4200";
 
@@ -12,9 +17,16 @@ export type ProjectSaveResponse = {
   source: "api" | "local";
 };
 
+export type ApiHealth = {
+  ok: boolean;
+  persistence: "mongodb" | "local";
+};
+
 function projectKey(id: string) {
   return `axe-project-${id}`;
 }
+
+const localProjectIndexKey = "axe-project-index";
 
 function authHeaders(token: string | null): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -28,6 +40,45 @@ async function parseResponse<T>(response: Response): Promise<T> {
   }
 
   return payload as T;
+}
+
+function readLocalProjectIndex(): ProjectSummary[] {
+  const raw = localStorage.getItem(localProjectIndexKey);
+
+  if (!raw) {
+    return [];
+  }
+
+  try {
+    return JSON.parse(raw) as ProjectSummary[];
+  } catch {
+    return [];
+  }
+}
+
+function rememberProject(project: SceneDocument) {
+  localStorage.setItem(projectKey(project.id), JSON.stringify(project));
+  const summary = createProjectSummary(project, "local");
+  const nextIndex = [
+    summary,
+    ...readLocalProjectIndex().filter((item) => item.id !== project.id),
+  ].slice(0, 50);
+  localStorage.setItem(localProjectIndexKey, JSON.stringify(nextIndex));
+}
+
+function readLocalProject(id: string) {
+  const cached = localStorage.getItem(projectKey(id));
+
+  if (!cached) {
+    return null;
+  }
+
+  return parseSceneDocument(JSON.parse(cached));
+}
+
+export async function getApiHealth() {
+  const response = await fetch(`${API_BASE}/health`);
+  return parseResponse<ApiHealth>(response);
 }
 
 export async function register(email: string, password: string) {
@@ -54,6 +105,8 @@ export async function saveProject(
   project: SceneDocument,
   token: string | null,
 ): Promise<ProjectSaveResponse> {
+  const validProject = parseSceneDocument(project);
+
   try {
     const response = await fetch(`${API_BASE}/project`, {
       method: "POST",
@@ -61,15 +114,16 @@ export async function saveProject(
         "Content-Type": "application/json",
         ...authHeaders(token),
       },
-      body: JSON.stringify(project),
+      body: JSON.stringify(validProject),
     });
 
     const payload = await parseResponse<{ project: SceneDocument }>(response);
-    localStorage.setItem(projectKey(payload.project.id), JSON.stringify(payload.project));
-    return { project: payload.project, source: "api" };
+    const parsedProject = parseSceneDocument(payload.project);
+    rememberProject(parsedProject);
+    return { project: parsedProject, source: "api" };
   } catch {
-    localStorage.setItem(projectKey(project.id), JSON.stringify(project));
-    return { project, source: "local" };
+    rememberProject(validProject);
+    return { project: validProject, source: "local" };
   }
 }
 
@@ -82,16 +136,37 @@ export async function loadProject(
       headers: authHeaders(token),
     });
     const payload = await parseResponse<{ project: SceneDocument }>(response);
-    localStorage.setItem(projectKey(payload.project.id), JSON.stringify(payload.project));
-    return { project: payload.project, source: "api" };
+    const parsedProject = parseSceneDocument(payload.project);
+    rememberProject(parsedProject);
+    return { project: parsedProject, source: "api" };
   } catch {
-    const cached = localStorage.getItem(projectKey(id));
+    const cached = readLocalProject(id);
 
     if (!cached) {
       throw new Error("Project not found locally or on the API");
     }
 
-    return { project: JSON.parse(cached) as SceneDocument, source: "local" };
+    return { project: cached, source: "local" };
+  }
+}
+
+export async function listProjects(token: string | null): Promise<ProjectSummary[]> {
+  const localProjects = readLocalProjectIndex();
+
+  try {
+    const response = await fetch(`${API_BASE}/projects`, {
+      headers: authHeaders(token),
+    });
+    const payload = await parseResponse<{ projects: ProjectSummary[] }>(response);
+    const merged = [...payload.projects, ...localProjects];
+    return Array.from(
+      new Map(merged.map((project) => [project.id, project])).values(),
+    ).sort(
+      (a, b) =>
+        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+    );
+  } catch {
+    return localProjects;
   }
 }
 

@@ -5,6 +5,10 @@
 :root {
   --background: #08090b;
   --foreground: #f4f4f5;
+  --font-interface: "Geist", "Inter", "SF Pro Display", "Segoe UI", ui-sans-serif,
+    system-ui, sans-serif;
+  --font-code: "Geist Mono", "SFMono-Regular", "Roboto Mono", ui-monospace,
+    monospace;
   color-scheme: dark;
 }
 
@@ -20,7 +24,15 @@ body {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-interface);
+}
+
+.font-mono,
+code,
+kbd,
+pre,
+samp {
+  font-family: var(--font-code);
 }
 
 button,

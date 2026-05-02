@@ -1,7 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import mongoose from "mongoose";
-import type { SceneDocument } from "../../lib/scene";
+import { createProjectSummary, type ProjectSummary, type SceneDocument } from "../../lib/scene";
+import { safeParseSceneDocument } from "../../lib/scene-schema";
 import { ProjectModel } from "../models/Project";
 import { UserModel } from "../models/User";
 
@@ -16,6 +17,8 @@ type StoredProject = {
   id: string;
   ownerId: string | null;
   project: SceneDocument;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 type LocalDb = {
@@ -53,7 +56,9 @@ async function readLocalDb(): Promise<LocalDb> {
 
 async function writeLocalDb(db: LocalDb) {
   await fs.mkdir(path.dirname(localDbPath), { recursive: true });
-  await fs.writeFile(localDbPath, JSON.stringify(db, null, 2));
+  const tempPath = `${localDbPath}.tmp`;
+  await fs.writeFile(tempPath, JSON.stringify(db, null, 2));
+  await fs.rename(tempPath, localDbPath);
 }
 
 export async function findUserByEmail(email: string) {
@@ -131,7 +136,15 @@ export async function saveProject(scene: SceneDocument, ownerId: string | null) 
   const existingIndex = db.projects.findIndex(
     (item) => item.id === project.id && item.ownerId === ownerId,
   );
-  const record: StoredProject = { id: project.id, ownerId, project };
+  const existingProject =
+    existingIndex >= 0 ? db.projects[existingIndex] : null;
+  const record: StoredProject = {
+    id: project.id,
+    ownerId,
+    project,
+    createdAt: existingProject?.createdAt ?? project.updatedAt,
+    updatedAt: project.updatedAt,
+  };
 
   if (existingIndex >= 0) {
     db.projects[existingIndex] = record;
@@ -154,9 +167,9 @@ export async function loadProject(id: string, ownerId: string | null) {
       ownerId: null,
     }).lean();
 
-    return (ownedProject?.scene ?? guestProject?.scene ?? null) as
-      | SceneDocument
-      | null;
+    const scene = ownedProject?.scene ?? guestProject?.scene ?? null;
+    const parsedScene = safeParseSceneDocument(scene);
+    return parsedScene.success ? parsedScene.data : null;
   }
 
   const db = await readLocalDb();
@@ -167,5 +180,52 @@ export async function loadProject(id: string, ownerId: string | null) {
     (item) => item.id === id && item.ownerId === null,
   );
 
-  return ownedProject?.project ?? guestProject?.project ?? null;
+  const scene = ownedProject?.project ?? guestProject?.project ?? null;
+  const parsedScene = safeParseSceneDocument(scene);
+  return parsedScene.success ? parsedScene.data : null;
+}
+
+function safeSummary(input: unknown, scope: ProjectSummary["scope"]) {
+  const parsedScene = safeParseSceneDocument(input);
+
+  if (!parsedScene.success) {
+    return null;
+  }
+
+  return createProjectSummary(parsedScene.data, scope);
+}
+
+export async function listProjects(ownerId: string | null): Promise<ProjectSummary[]> {
+  if (hasMongo()) {
+    await connectMongo();
+    const query = ownerId
+      ? { ownerId: { $in: [ownerId, null] } }
+      : { ownerId: null };
+    const records = await ProjectModel.find(query)
+      .sort({ updatedAt: -1 })
+      .limit(50)
+      .lean();
+
+    return records
+      .map((record) => safeSummary(record.scene, record.ownerId ? "account" : "local"))
+      .filter((project) => project !== null)
+      .sort(
+        (a, b) =>
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      );
+  }
+
+  const db = await readLocalDb();
+  const projects = db.projects.filter((project) =>
+    ownerId ? project.ownerId === ownerId || project.ownerId === null : project.ownerId === null,
+  );
+
+  return projects
+    .map((record) => safeSummary(record.project, record.ownerId ? "account" : "local"))
+    .filter((project) => project !== null)
+    .sort(
+      (a, b) =>
+        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+    )
+    .slice(0, 50);
 }

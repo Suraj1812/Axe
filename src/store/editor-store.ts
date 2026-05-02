@@ -7,7 +7,7 @@ import {
   createDefaultScene,
   createSceneObject,
   createUiBlock,
-  lerpTuple,
+  getSceneObjectsAtTime,
   makeId,
   type KeyframeChannel,
   type SceneDocument,
@@ -55,7 +55,7 @@ type EditorStore = {
   addKeyframe: (objectId: string, channel: KeyframeChannel) => void;
   updateKeyframe: (id: string, patch: Partial<SceneKeyframe>) => void;
   deleteKeyframe: (id: string) => void;
-  setCurrentTime: (time: number, preview?: boolean) => void;
+  setCurrentTime: (time: number) => void;
   setDuration: (duration: number) => void;
   setPlaying: (isPlaying: boolean) => void;
   setScrollAnimationEnabled: (enabled: boolean) => void;
@@ -86,55 +86,6 @@ function withHistory(state: EditorStore) {
     past: [...state.past.slice(-49), snapshot(state)],
     future: [],
   };
-}
-
-function previewObjectsAtTime(
-  objects: SceneObject[],
-  keyframes: SceneKeyframe[],
-  time: number,
-) {
-  return objects.map((object) => {
-    const patch: Partial<SceneObject> = {};
-
-    (["position", "rotation", "scale"] as KeyframeChannel[]).forEach(
-      (channel) => {
-        const frames = keyframes
-          .filter((frame) => frame.objectId === object.id && frame.channel === channel)
-          .sort((a, b) => a.time - b.time);
-
-        if (frames.length === 0) {
-          return;
-        }
-
-        const first = frames[0];
-        const last = frames[frames.length - 1];
-
-        if (time <= first.time) {
-          patch[channel] = first.value;
-          return;
-        }
-
-        if (time >= last.time) {
-          patch[channel] = last.value;
-          return;
-        }
-
-        const nextIndex = frames.findIndex((frame) => frame.time >= time);
-        const prev = frames[nextIndex - 1];
-        const next = frames[nextIndex];
-        const span = Math.max(next.time - prev.time, 0.001);
-        const rawProgress = clamp((time - prev.time) / span, 0, 1);
-        const eased =
-          next.easing === "power2.out"
-            ? 1 - Math.pow(1 - rawProgress, 2)
-            : rawProgress;
-
-        patch[channel] = lerpTuple(prev.value, next.value, eased);
-      },
-    );
-
-    return Object.keys(patch).length > 0 ? { ...object, ...patch } : object;
-  });
 }
 
 export const useEditorStore = create<EditorStore>()(
@@ -194,7 +145,12 @@ export const useEditorStore = create<EditorStore>()(
       setTransformMode: (mode) => set({ transformMode: mode }),
       addKeyframe: (objectId, channel) => {
         const state = get();
-        const object = state.objects.find((item) => item.id === objectId);
+        const animatedObjects = getSceneObjectsAtTime(
+          state.objects,
+          state.keyframes,
+          state.currentTime,
+        );
+        const object = animatedObjects.find((item) => item.id === objectId);
 
         if (!object) {
           return;
@@ -229,15 +185,10 @@ export const useEditorStore = create<EditorStore>()(
           keyframes: state.keyframes.filter((frame) => frame.id !== id),
         }));
       },
-      setCurrentTime: (time, preview = true) => {
+      setCurrentTime: (time) => {
         const state = get();
         const nextTime = clamp(time, 0, state.duration);
-        set({
-          currentTime: nextTime,
-          objects: preview
-            ? previewObjectsAtTime(state.objects, state.keyframes, nextTime)
-            : state.objects,
-        });
+        set({ currentTime: nextTime });
       },
       setDuration: (duration) =>
         set({ duration: clamp(Number(duration.toFixed(2)), 1, 30) }),
